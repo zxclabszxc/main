@@ -1,0 +1,38 @@
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Robojini/Tuturial_UI_Library/main/UI_Template_1"))()
+local Window = Library.CreateLib("ЧУРОКВАРЕ", "RJTheme3")
+local Tab = Window:NewTab("Для даунов")
+local Section = Tab:NewSection("Я ДУРА")
+Section:NewButton("УДАЛИТЬ МАШИНА", "ТЫ ДАЛБАЕП?", function()
+    task.spawn(function()
+        local Players = game:GetService("Players")
+        local player = Players.LocalPlayer
+        local del = {"Body", "Black", "Grey"}
+        local chast = workspace.Vehicles:WaitForChild(player.Name) 
+        local gde = chast:WaitForChild("Body")
+        for q, w in ipairs(del) do
+            local object = gde:FindFirstChild(w)
+            if object then
+                object:Destroy()
+            end
+        end
+    end)
+end)
+
+Section:NewButton("УДАЛИД ВЗЯГИЕ БРИБЯДЗДВИЯ", "НУ НИ ТУПИ", function()
+        for _, v in ipairs(workspace:GetDescendants()) do
+        if v.Name == "Streetlamps" or v.Name == "Signs" or v.Name == "TrafficLight" then
+            v:Destroy()
+        end
+    end
+
+    local trafficLights = workspace.Roads:FindFirstChild("Traffic Lights")
+    if trafficLights then
+        trafficLights:Destroy()
+    end
+end)
+
+Section:NewButton("Я чурочка", "назми если ти чурочка", function()
+    while true do
+
+    end
+end)
