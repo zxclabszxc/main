@@ -52,8 +52,6 @@ Section:NewButton("бизганечна здамина", "делаид бизг�
 end)
 
 Section:NewButton("АВТОНАРУЧНИКИ", "КИМПИНТЯВА", function()
-    БЕЗ НАРУЧНИКОВ
-
     local Players = game:GetService("Players")
     local lp = Players.LocalPlayer
     local RS = game:GetService("RunService")
@@ -133,4 +131,5 @@ Section:NewButton("АВТОНАРУЧНИКИ", "КИМПИНТЯВА", function
             isProcessing = false
         end
     end)
+
 end)
