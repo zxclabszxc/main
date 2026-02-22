@@ -39,6 +39,19 @@ end)
 
 
 Section:NewButton("бизганечна здамина", "делаид бизганечну здамину", function()
+    if not game:IsLoaded() then game.Loaded:Wait(); end;
+    local Players: Players = cloneref(game:GetService("Players"));
+    local RS: ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"));
+
+    local plr = Players.LocalPlayer;
+    local s3, stamina = pcall(require, plr.PlayerScripts.Code.controllers.character.characterStaminaController);
+    if not s3 then
+        return warn(executor .. " returned an error while trying to require plr.PlayerScripts.Code.controllers.character.characterStaminaController:\n" .. stamina);
+    end;
+    rawset(rawget(stamina, "CharacterStaminaController"), "getStamina", function() return math.huge; end); -- Got annoyed having to walk, enjoy!
+end)
+
+Section:NewButton("АВТОНАРУЧНИКИ", "КИМПИНТЯВА", function()
     local Players = game:GetService("Players")
     local lp = Players.LocalPlayer
     local RS = game:GetService("RunService")
@@ -109,5 +122,4 @@ Section:NewButton("бизганечна здамина", "делаид бизг�
             isProcessing = false
         end
     end)
-
 end)
