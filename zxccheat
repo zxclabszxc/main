@@ -51,7 +51,7 @@ Section:NewButton("бизганечна здамина", "делаид бизг�
     rawset(rawget(stamina, "CharacterStaminaController"), "getStamina", function() return math.huge; end); -- Got annoyed having to walk, enjoy!
 end)
 
-Section:NewButton("АВТОНАРУЧНИКИ", "КИМПИНТЯВА", function()
+Section:NewButton("auto-cuff", "cuff", function()
     local Players = game:GetService("Players")
     local lp = Players.LocalPlayer
     local RS = game:GetService("RunService")
@@ -131,5 +131,4 @@ Section:NewButton("АВТОНАРУЧНИКИ", "КИМПИНТЯВА", function
             isProcessing = false
         end
     end)
-
 end)
