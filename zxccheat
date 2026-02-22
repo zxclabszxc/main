@@ -39,27 +39,15 @@ end)
 
 
 Section:NewButton("бизганечна здамина", "делаид бизганечну здамину", function()
-    if not game:IsLoaded() then game.Loaded:Wait(); end;
-    local Players: Players = cloneref(game:GetService("Players"));
-    local RS: ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"));
-
-    local plr = Players.LocalPlayer;
-    local s3, stamina = pcall(require, plr.PlayerScripts.Code.controllers.character.characterStaminaController);
-    if not s3 then
-        return warn(executor .. " returned an error while trying to require plr.PlayerScripts.Code.controllers.character.characterStaminaController:\n" .. stamina);
-    end;
-    rawset(rawget(stamina, "CharacterStaminaController"), "getStamina", function() return math.huge; end); -- Got annoyed having to walk, enjoy!
-end)
-
-Section:NewButton("АВТОНАРУЧНИКИ", "КИМПИНТЯВА", function()
     local Players = game:GetService("Players")
     local lp = Players.LocalPlayer
     local RS = game:GetService("RunService")
 
-    -- === НАСТРОЙКИ (УСКОРЕННЫЕ) ===
+    -- === НАСТРОЙКИ (СТАБИЛЬНЫЕ) ===
     local CUFF_DISTANCE = 7  
-    local CUFF_COOLDOWN = 0.5 -- Снижено с 1.5 до 0.5 для быстрого переключения между целями
-    local ACTION_DELAY = 0.03 -- МИНИМАЛЬНАЯ задержка для регистрации (быстрее 0.1)
+    local CUFF_COOLDOWN = 1.2 -- Оптимальный откат
+    local EQUIP_WAIT = 0.15   -- Время, чтобы сервер "увидел" наручники в руках
+    local ACTION_WAIT = 0.2    -- Время на саму анимацию ареста (чтобы сервер засчитал)
 
     local lastCuff = 0
     local isProcessing = false
@@ -80,21 +68,15 @@ Section:NewButton("АВТОНАРУЧНИКИ", "КИМПИНТЯВА", function
     local function getCuffTarget()
         local char = lp.Character
         if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-        
-        local myPos = char.HumanoidRootPart.Position
         local closest, dist = nil, CUFF_DISTANCE
-        
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= lp and p.Character then
                 local pChar = p.Character
-                local hrp = pChar:FindFirstChild("HumanoidRootPart")
-                if hrp and not pChar:GetAttribute("IsCuffed") and pChar.Humanoid.Health > 0 then
-                    if isWanted(p) then
-                        local d = (myPos - hrp.Position).Magnitude
-                        if d < dist then
-                            dist = d
-                            closest = hrp
-                        end
+                if isWanted(p) and not pChar:GetAttribute("IsCuffed") and pChar.Humanoid.Health > 0 then
+                    local d = (char.HumanoidRootPart.Position - pChar.HumanoidRootPart.Position).Magnitude
+                    if d < dist then
+                        dist = d
+                        closest = pChar.HumanoidRootPart
                     end
                 end
             end
@@ -102,7 +84,6 @@ Section:NewButton("АВТОНАРУЧНИКИ", "КИМПИНТЯВА", function
         return closest
     end
 
-    -- Оптимизированный цикл
     RS.Heartbeat:Connect(function()
         if isProcessing or (tick() - lastCuff < CUFF_COOLDOWN) then return end
         
@@ -110,19 +91,21 @@ Section:NewButton("АВТОНАРУЧНИКИ", "КИМПИНТЯВА", function
         if target then
             isProcessing = true
             
-            -- ШАГ 1: Эквип и Старт ареста почти одновременно
+            -- ШАГ 1: Достаем наручники
             EquipRemote:FireServer("Handcuffs")
-            task.wait(ACTION_DELAY) 
+            task.wait(EQUIP_WAIT) -- Даем серверу время понять, что у нас в руках
             
+            -- ШАГ 2: Старт ареста
             CuffRemote:FireServer(target, "QgA", false)
             
-            -- ШАГ 2: Завершение (0.05-0.07 это грань кика, 0.03 может быть слишком быстро)
-            task.wait(0.05) 
+            -- ШАГ 3: Ждем чуть дольше (0.2с - это "золотая середина" для EH)
+            task.wait(ACTION_WAIT) 
             
+            -- ШАГ 4: Завершение
             CuffRemote:FireServer(target, "QgA", true)
             
             lastCuff = tick()
-            print("Instant Cuffed: " .. target.Parent.Name)
+            print("Cuffed Successfully: " .. target.Parent.Name)
             isProcessing = false
         end
     end)
