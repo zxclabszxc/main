@@ -56,50 +56,45 @@ Section:NewButton("АВТОНАРУЧНИКИ", "КИМПИНТЯВА", function
     local lp = Players.LocalPlayer
     local RS = game:GetService("RunService")
 
-    -- === НАСТРОЙКИ ===
-    local CUFF_DISTANCE = 7  -- Расстояние для срабатывания
-    local CUFF_COOLDOWN = 1.5 -- Задержка между арестами
+    -- === НАСТРОЙКИ (УСКОРЕННЫЕ) ===
+    local CUFF_DISTANCE = 7  
+    local CUFF_COOLDOWN = 0.5 -- Снижено с 1.5 до 0.5 для быстрого переключения между целями
+    local ACTION_DELAY = 0.03 -- МИНИМАЛЬНАЯ задержка для регистрации (быстрее 0.1)
 
     local lastCuff = 0
     local isProcessing = false
 
-    -- === РЕМУТЫ ИЗ ТВОИХ ЛОГОВ ===
+    -- === РЕМУТЫ ===
     local EquipRemote = game.ReplicatedStorage.EJw["b16cb2a5-7735-4e84-a72b-22718da109fc"]
     local CuffRemote = game.ReplicatedStorage.EJw["a3126821-130a-4135-80e1-1d28cece4007"]
 
-    -- Модуль для проверки розыска (из твоей базы V22)
     local s2, producer = pcall(require, lp.PlayerScripts.Code.producer)
 
-    -- Твоя рабочая проверка розыска (1+)
     local function isWanted(player)
         if not s2 then return false end
-        local _producer = rawget(producer, "producer")
-        if _producer then
-            local wantedData = rawget(rawget(_producer:getState(), "wantedData"), "data")
-            local data = rawget(wantedData, player.Name)
-            if data then
-                local wl = rawget(data, "wantedLevel")
-                if wl and wl >= 1 then return true end
-            end
-        end
-        return false
+        local state = producer.producer:getState()
+        local data = state.wantedData.data[player.Name]
+        return data and data.wantedLevel and data.wantedLevel >= 1
     end
 
-    -- Поиск ближайшего преступника
     local function getCuffTarget()
         local char = lp.Character
         if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+        
+        local myPos = char.HumanoidRootPart.Position
         local closest, dist = nil, CUFF_DISTANCE
         
         for _, p in pairs(Players:GetPlayers()) do
-            if p ~= lp and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            if p ~= lp and p.Character then
                 local pChar = p.Character
-                -- Цель должна: Иметь розыск + Быть живой + Еще не быть в наручниках
-                if isWanted(p) and pChar.Humanoid.Health > 0 and not pChar:GetAttribute("IsCuffed") then
-                    local d = (char.HumanoidRootPart.Position - pChar.HumanoidRootPart.Position).Magnitude
-                    if d < dist then
-                        dist = d
-                        closest = pChar.HumanoidRootPart
+                local hrp = pChar:FindFirstChild("HumanoidRootPart")
+                if hrp and not pChar:GetAttribute("IsCuffed") and pChar.Humanoid.Health > 0 then
+                    if isWanted(p) then
+                        local d = (myPos - hrp.Position).Magnitude
+                        if d < dist then
+                            dist = d
+                            closest = hrp
+                        end
                     end
                 end
             end
@@ -107,32 +102,27 @@ Section:NewButton("АВТОНАРУЧНИКИ", "КИМПИНТЯВА", function
         return closest
     end
 
-    -- Основной цикл
+    -- Оптимизированный цикл
     RS.Heartbeat:Connect(function()
         if isProcessing or (tick() - lastCuff < CUFF_COOLDOWN) then return end
         
         local target = getCuffTarget()
         if target then
             isProcessing = true
-            lastCuff = tick()
             
-            -- ШАГ 1: Достаем наручники (Equip)
+            -- ШАГ 1: Эквип и Старт ареста почти одновременно
             EquipRemote:FireServer("Handcuffs")
-            task.wait(0.1) -- Микро-пауза для синхронизации
+            task.wait(ACTION_DELAY) 
             
-            -- ШАГ 2: НАЧИНАЕМ АРЕСТ (false)
-            -- Передаем: HumanoidRootPart цели, Твой Ключ "QgA", Статус Начала
             CuffRemote:FireServer(target, "QgA", false)
             
-            -- ШАГ 3: ПРОПУСК ТАЙМЕРА (Мгновенное завершение)
-            -- Ждем минимальное время (0.1с), чтобы сервер не кикнул за "Fast Interaction"
-            task.wait(0.1)
+            -- ШАГ 2: Завершение (0.05-0.07 это грань кика, 0.03 может быть слишком быстро)
+            task.wait(0.05) 
             
-            -- ОТПРАВЛЯЕМ ЗАВЕРШЕНИЕ (true)
             CuffRemote:FireServer(target, "QgA", true)
             
-            print("Fast Cuff: Арестован " .. target.Parent.Name .. " без ожидания таймера!")
-            
+            lastCuff = tick()
+            print("Instant Cuffed: " .. target.Parent.Name)
             isProcessing = false
         end
     end)
