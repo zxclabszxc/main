@@ -56,45 +56,163 @@ Section:NewButton("auto-cuff", "cuff", function()
     local lp = Players.LocalPlayer
     local RS = game:GetService("RunService")
 
-    -- === НАСТРОЙКИ ===
-    local CUFF_DISTANCE = 7  -- Расстояние для срабатывания
-    local CUFF_COOLDOWN = 1.5 -- Задержка между арестами
-
+    local CUFF_DISTANCE = 7
+    local CUFF_COOLDOWN = 1.5
     local lastCuff = 0
     local isProcessing = false
 
-    -- === РЕМУТЫ (Только Cuff) ===
     local CuffRemote = game.ReplicatedStorage.EJw["a3126821-130a-4135-80e1-1d28cece4007"]
 
-    -- Модуль для проверки розыска
     local s2, producer = pcall(require, lp.PlayerScripts.Code.producer)
 
-    -- Твоя рабочая проверка розыска (1+)
+    local function isWanted(player)
+        if not s2 then return false end
+        local _producer = rawget(producer, "producer")
+        if not _producer then return false end
+
+        local wantedData = rawget(rawget(_producer:getState(), "wantedData"), "data")
+        local data = rawget(wantedData, player.Name)
+        return data and (rawget(data, "wantedLevel") or 0) >= 1
+    end
+
+    -- 🔥 ИЩЕМ ИГРОКА, А НЕ HRP
+    local function getCuffTarget()
+        local char = lp.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        local closest, dist = nil, CUFF_DISTANCE
+
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= lp and p.Character then
+                local c = p.Character
+                local phrp = c:FindFirstChild("HumanoidRootPart")
+                local hum = c:FindFirstChild("Humanoid")
+
+                if phrp and hum and hum.Health > 0 and isWanted(p) and not c:GetAttribute("IsCuffed") then
+                    local d = (hrp.Position - phrp.Position).Magnitude
+                    if d < dist and d > 1.2 then -- 🔥 защита от "слишком близко"
+                        dist = d
+                        closest = p
+                    end
+                end
+            end
+        end
+
+        return closest
+    end
+
+    -- 🔥 ОСНОВНОЙ ЦИКЛ
+    RS.RenderStepped:Connect(function()
+        if isProcessing or tick() - lastCuff < CUFF_COOLDOWN then return end
+
+        local targetPlayer = getCuffTarget()
+        if not targetPlayer or not targetPlayer.Character then return end
+
+        local targetHRP = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not targetHRP then return end
+
+        isProcessing = true
+        lastCuff = tick()
+
+        -- ШАГ 1
+        CuffRemote:FireServer(targetHRP, "QgA", false)
+
+        -- 🔥 ВАЖНО: дать серверу догнать позицию
+        task.wait(0.45)
+
+        -- ШАГ 2
+        CuffRemote:FireServer(targetHRP, "QgA", true)
+
+        print("Cuffed:", targetPlayer.Name)
+
+        task.wait(0.2)
+        isProcessing = false
+    end)
+end)
+
+Section:NewButton("автотазир", "крута", function()
+    local Players = game:GetService("Players")
+    local lp = Players.LocalPlayer
+    local camera = workspace.CurrentCamera
+    local RS = game:GetService("RunService")
+
+    -- НАСТРОЙКИ
+    local TRIGGER_DISTANCE = 14 
+    local RELOAD_TIME = 12.9 
+    local SHOT_DELAY = 0.2 
+
+    local lastShot = 0
+    local isShooting = false
+    local gunlist = {} -- Список вооруженных игроков
+
+    -- РЕМУТЫ И МОДУЛИ
+    local s2, producer = pcall(require, lp.PlayerScripts.Code.producer)
+    local EquipRemote = game.ReplicatedStorage.EJw["b16cb2a5-7735-4e84-a72b-22718da109fc"]
+    local ShootRemote = game.ReplicatedStorage.EJw["56fd07c4-e93d-410f-a8e5-2ce7f81aab51"]
+
+    -- 1. СИСТЕМА ОТСЛЕЖИВАНИЯ ОРУЖИЯ (из твоего кода)
+    local function checkTool(t) 
+        return t:IsA("Tool") and ((t:GetAttribute("AimDelay") and t:GetAttribute("Damage")) or t:GetAttribute("DamageType")) ~= nil 
+    end
+
+    local function setupGunCheck(char, id)
+        char.ChildAdded:Connect(function(c) if checkTool(c) then gunlist[id] = true end end)
+        char.ChildRemoved:Connect(function(c) if checkTool(c) then task.delay(5, function() gunlist[id] = false end) end end)
+        local t = char:FindFirstChildOfClass("Tool")
+        if t and checkTool(t) then gunlist[id] = true end
+    end
+
+    for _, v in pairs(Players:GetPlayers()) do
+        if v.Character then setupGunCheck(v.Character, tostring(v.UserId)) end
+        v.CharacterAdded:Connect(function(c) setupGunCheck(c, tostring(v.UserId)) end)
+    end
+
+    -- 2. ПРОВЕРКА РОЗЫСКА (Wanted + GunList)
     local function isWanted(player)
         if not s2 then return false end
         local _producer = rawget(producer, "producer")
         if _producer then
+            local id = tostring(player.UserId)
             local wantedData = rawget(rawget(_producer:getState(), "wantedData"), "data")
             local data = rawget(wantedData, player.Name)
             if data then
                 local wl = rawget(data, "wantedLevel")
-                if wl and wl >= 1 then return true end
+                -- Условие: Розыск 1+ ИЛИ игрок держит оружие
+                if wl and (wl >= 1 or gunlist[id]) then
+                    return true
+                end
             end
         end
         return false
     end
 
-    -- Поиск ближайшего преступника
-    local function getCuffTarget()
+    -- 3. ПОИСК ОБЪЕКТА ТАЗЕРА
+    local function getTaserInstance()
+        local tool = lp.Character and lp.Character:FindFirstChild("Taser")
+        if tool then return tool end
+        for _, v in pairs(getnilinstances()) do
+            if v.Name == "Taser" then return v end
+        end
+        return lp.Backpack:FindFirstChild("Taser")
+    end
+
+    -- 4. ПОИСК ЦЕЛИ (Интегрированы Cuffed и Held)
+    local function getTarget()
         local char = lp.Character
         if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-        local closest, dist = nil, CUFF_DISTANCE
+        local closest, dist = nil, TRIGGER_DISTANCE
         
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= lp and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                 local pChar = p.Character
-                -- Цель должна: Иметь розыск + Быть живой + Еще не быть в наручниках
-                if isWanted(p) and pChar.Humanoid.Health > 0 and not pChar:GetAttribute("IsCuffed") then
+                local hum = pChar:FindFirstChildOfClass("Humanoid")
+                
+                -- ПРОВЕРКИ ИЗ ТВОЕГО КОДА: Живой + Розыск/Оружие + Не в наручниках + Не схвачен
+                local isCuffed = pChar:GetAttribute("IsCuffed") or pChar:FindFirstChild("Cuffed")
+                local isHeld = pChar:GetAttribute("IsHeld")
+                
+                if hum and hum.Health > 0 and isWanted(p) and not isCuffed and not isHeld then
                     local d = (char.HumanoidRootPart.Position - pChar.HumanoidRootPart.Position).Magnitude
                     if d < dist then
                         dist = d
@@ -106,29 +224,38 @@ Section:NewButton("auto-cuff", "cuff", function()
         return closest
     end
 
-    -- Основной цикл
+    -- 5. ЦИКЛ ВЫСТРЕЛА
     RS.Heartbeat:Connect(function()
-        if isProcessing or (tick() - lastCuff < CUFF_COOLDOWN) then return end
-        
-        local target = getCuffTarget()
-        if target then
-            isProcessing = true
-            lastCuff = tick()
-            
-            -- ШАГ 1: НАЧИНАЕМ АРЕСТ (false)
-            -- Передаем: HumanoidRootPart цели, Твой Ключ "QgA", Статус Начала
-            CuffRemote:FireServer(target, "QgA", false)
-            
-            -- ШАГ 2: ПРОПУСК ТАЙМЕРА (Мгновенное завершение)
-            -- Если по бегущим целям не срабатывает, увеличь эту задержку до 0.8
-            task.wait(0.1)
-            
-            -- ОТПРАВЛЯЕМ ЗАВЕРШЕНИЕ (true)
-            CuffRemote:FireServer(target, "QgA", true)
-            
-            print("Fast Cuff (No Equip): Арестован " .. target.Parent.Name)
-            
-            isProcessing = false
-        end
+        if isShooting or (tick() - lastShot < RELOAD_TIME) then return end
+
+        local target = getTarget()
+        if not target then return end
+
+        local taserObj = getTaserInstance()
+        if not taserObj or taserObj.Parent ~= lp.Character then return end
+
+        local char = lp.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        isShooting = true
+
+        local origin = hrp.Position + Vector3.new(0, 1.4, 0)
+
+        -- 🔥 УПРЕЖДЕНИЕ
+        local vel = target.AssemblyLinearVelocity
+        local dist = (target.Position - origin).Magnitude
+        local travelTime = dist / 210 -- скорость тазера
+        local predictedPos = target.Position + vel * travelTime
+
+        local direction = (predictedPos - origin).Unit
+
+        ShootRemote:FireServer(taserObj, origin, direction)
+        print("EH: Lead Taser hit attempt:", target.Parent.Name)
+
+        lastShot = tick()
+        task.wait(0.25)
+        isShooting = false
     end)
+
 end)
