@@ -119,14 +119,14 @@ Section:NewButton("auto-cuff", "cuff", function()
         CuffRemote:FireServer(targetHRP, "QgA", false)
 
         -- 🔥 ВАЖНО: дать серверу догнать позицию
-        task.wait(0.8)
+        task.wait(0.45)
 
         -- ШАГ 2
         CuffRemote:FireServer(targetHRP, "QgA", true)
 
         print("Cuffed:", targetPlayer.Name)
 
-        task.wait(0.8)
+        task.wait(0.2)
         isProcessing = false
     end)
 end)
