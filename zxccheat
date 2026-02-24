@@ -115,14 +115,14 @@ Section:NewButton("auto-cuff", "cuff", function()
         isProcessing = true
         lastCuff = tick()
 
-        -- ШАГ 1 (Начало ареста)
-        CuffRemote:FireServer(targetHRP, "QgA", true)
+        -- ШАГ 1
+        CuffRemote:FireServer(targetHRP, "QgA", false)
 
         -- 🔥 ВАЖНО: дать серверу догнать позицию
-        task.wait(0.8)
+        task.wait(0.45)
 
-        -- ШАГ 2 (Конец ареста)
-        CuffRemote:FireServer(targetHRP, "QgA", false)
+        -- ШАГ 2
+        CuffRemote:FireServer(targetHRP, "QgA", true)
 
         print("Cuffed:", targetPlayer.Name)
 
