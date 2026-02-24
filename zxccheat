@@ -51,58 +51,49 @@ Section:NewButton("бизганечна здамина", "делаид бизг�
     rawset(rawget(stamina, "CharacterStaminaController"), "getStamina", function() return math.huge; end); -- Got annoyed having to walk, enjoy!
 end)
 
-Section:NewButton("auto-cuff", "cuff", function()
+Section:NewButton("auto-cuff (MAX SPEED)", "cuff", function()
     local Players = game:GetService("Players")
     local lp = Players.LocalPlayer
     local RS = game:GetService("RunService")
 
-    local CUFF_DISTANCE = 7
-    local CUFF_COOLDOWN = 1.5
+    local CUFF_DISTANCE = 4 
+    local CUFF_COOLDOWN = 0.1 -- Почти мгновенный откат для следующей попытки
     local lastCuff = 0
     local isProcessing = false
 
     local CuffRemote = game.ReplicatedStorage.EJw["a3126821-130a-4135-80e1-1d28cece4007"]
-
     local s2, producer = pcall(require, lp.PlayerScripts.Code.producer)
 
     local function isWanted(player)
         if not s2 then return false end
         local _producer = rawget(producer, "producer")
         if not _producer then return false end
-
         local wantedData = rawget(rawget(_producer:getState(), "wantedData"), "data")
         local data = rawget(wantedData, player.Name)
         return data and (rawget(data, "wantedLevel") or 0) >= 1
     end
 
-    -- 🔥 ИЩЕМ ИГРОКА, А НЕ HRP
     local function getCuffTarget()
         local char = lp.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
-
         local closest, dist = nil, CUFF_DISTANCE
-
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= lp and p.Character then
                 local c = p.Character
                 local phrp = c:FindFirstChild("HumanoidRootPart")
-                local hum = c:FindFirstChild("Humanoid")
-
-                if phrp and hum and hum.Health > 0 and isWanted(p) and not c:GetAttribute("IsCuffed") then
+                if phrp and isWanted(p) and not c:GetAttribute("IsCuffed") then
                     local d = (hrp.Position - phrp.Position).Magnitude
-                    if d < dist and d > 1.2 then -- 🔥 защита от "слишком близко"
+                    if d < dist then 
                         dist = d
                         closest = p
                     end
                 end
             end
         end
-
         return closest
     end
 
-    -- 🔥 ОСНОВНОЙ ЦИКЛ
     RS.RenderStepped:Connect(function()
         if isProcessing or tick() - lastCuff < CUFF_COOLDOWN then return end
 
@@ -115,21 +106,23 @@ Section:NewButton("auto-cuff", "cuff", function()
         isProcessing = true
         lastCuff = tick()
 
-        -- ШАГ 1
+        -- ШАГ 1 (Начало)
         CuffRemote:FireServer(targetHRP, "QgA", false)
 
-        -- 🔥 ВАЖНО: дать серверу догнать позицию
-        task.wait(0.45)
+        -- 🔥 САМАЯ МИНИМАЛЬНАЯ ЗАДЕРЖКА (1 кадр)
+        task.wait()
 
-        -- ШАГ 2
+        -- ШАГ 2 (Конец)
         CuffRemote:FireServer(targetHRP, "QgA", true)
 
-        print("Cuffed:", targetPlayer.Name)
-
-        task.wait(0.2)
+        print("Fast Cuff sent to:", targetPlayer.Name)
+        
         isProcessing = false
     end)
 end)
+
+
+
 
 Section:NewButton("автотазир", "крута", function()
     local Players = game:GetService("Players")
