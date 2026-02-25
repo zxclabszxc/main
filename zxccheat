@@ -51,13 +51,13 @@ Section:NewButton("бизганечна здамина", "делаид бизг�
     rawset(rawget(stamina, "CharacterStaminaController"), "getStamina", function() return math.huge; end); -- Got annoyed having to walk, enjoy!
 end)
 
-Section:NewButton("auto-cuff (MAX SPEED)", "cuff", function()
+Section:NewButton("INSTANT-CUFF", "cuff", function()
     local Players = game:GetService("Players")
     local lp = Players.LocalPlayer
     local RS = game:GetService("RunService")
 
-    local CUFF_DISTANCE = 4 
-    local CUFF_COOLDOWN = 0.1 -- Почти мгновенный откат для следующей попытки
+    local CUFF_DISTANCE = 5 -- Немного увеличил, так как скорость теперь мгновенная
+    local CUFF_COOLDOWN = 0.5 
     local lastCuff = 0
     local isProcessing = false
 
@@ -106,17 +106,13 @@ Section:NewButton("auto-cuff (MAX SPEED)", "cuff", function()
         isProcessing = true
         lastCuff = tick()
 
-        -- ШАГ 1 (Начало)
+        -- 🔥 НУЛЕВАЯ ЗАДЕРЖКА: Пакеты летят пачкой
         CuffRemote:FireServer(targetHRP, "QgA", false)
-
-        -- 🔥 САМАЯ МИНИМАЛЬНАЯ ЗАДЕРЖКА (1 кадр)
-        task.wait()
-
-        -- ШАГ 2 (Конец)
         CuffRemote:FireServer(targetHRP, "QgA", true)
 
-        print("Fast Cuff sent to:", targetPlayer.Name)
+        print("Instant Cuff Sent:", targetPlayer.Name)
         
+        -- Сброс состояния без задержек
         isProcessing = false
     end)
 end)
